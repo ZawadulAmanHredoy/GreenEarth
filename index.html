@@ -227,23 +227,25 @@
             };
             
             // --- Rendering Functions ---
-            const renderCategories = (categories) => {
-                if (!categories || !Array.isArray(categories.data)) {
-                    console.error("Invalid categories data received:", categories);
+            const renderCategories = (data) => {
+                // FIX: The API returns { categories: [] }, not { data: [] }
+                if (!data || !Array.isArray(data.categories)) {
+                    console.error("Invalid categories data format received:", data);
                     return; 
                 }
                 const allTreesButton = `<li><button data-id="all" class="category-btn w-full text-left p-3 rounded-md active">All Trees</button></li>`;
-                categoriesContainer.innerHTML = allTreesButton + categories.data.map(cat => `
+                categoriesContainer.innerHTML = allTreesButton + data.categories.map(cat => `
                     <li><button class="category-btn w-full text-left p-3 rounded-md hover:bg-gray-200" data-id="${cat.category_id}">${cat.category_name}</button></li>
                 `).join('');
             };
 
-            const renderPlants = (plants) => {
-                if (!plants || !Array.isArray(plants.data) || plants.data.length === 0) {
+            const renderPlants = (data) => {
+                // FIX: The API returns { plants: [] }, not { data: [] }
+                if (!data || !Array.isArray(data.plants) || data.plants.length === 0) {
                     plantsContainer.innerHTML = `<p class="text-center text-gray-500 col-span-full">No plants found in this category.</p>`;
                     return;
                 }
-                plantsContainer.innerHTML = plants.data.map(plant => `
+                plantsContainer.innerHTML = data.plants.map(plant => `
                     <div class="bg-white rounded-lg shadow-md overflow-hidden flex flex-col transition-transform hover:scale-105">
                         <img src="${plant.image_url}" alt="${plant.plant_name}" class="w-full h-48 object-cover">
                         <div class="p-4 flex flex-col flex-grow">
@@ -277,6 +279,7 @@
             };
 
             const renderModal = (plantDetails) => {
+                // The details API uses { data: {} }, which is different. This is correct.
                 if (!plantDetails || !plantDetails.data) {
                     console.error("Invalid plant details received:", plantDetails);
                     return;
@@ -295,43 +298,30 @@
                 `;
                 modal.classList.remove('hidden');
             };
-
-            // --- Async Data Loading Functions ---
-            const loadCategoriesAsync = async () => {
-                const res = await fetch(API_CATEGORIES);
-                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-                const data = await res.json();
-                renderCategories(data);
-            };
-            
-            const loadPlantsAsync = async (categoryId = 'all') => {
-                const url = categoryId === 'all' ? API_PLANTS : `${API_PLANTS_BY_CATEGORY}${categoryId}`;
-                const res = await fetch(url);
-                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-                const data = await res.json();
-                renderPlants(data);
-            };
-
-            const loadPlantDetailsAsync = async (plantId) => {
-                const res = await fetch(`${API_PLANT_DETAILS}${plantId}`);
-                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-                const data = await res.json();
-                renderModal(data);
-            };
             
             // --- Event Handlers ---
-            const handleCategoryClick = (e) => {
+            const handleCategoryClick = async (e) => {
                 if (!e.target.matches('.category-btn')) return;
                 document.querySelectorAll('.category-btn').forEach(btn => btn.classList.remove('active'));
                 e.target.classList.add('active');
+                
                 const categoryId = e.target.dataset.id;
+                const url = categoryId === 'all' ? API_PLANTS : `${API_PLANTS_BY_CATEGORY}${categoryId}`;
+
                 toggleSpinner(true);
-                loadPlantsAsync(categoryId)
-                    .catch(handleFetchError)
-                    .finally(() => toggleSpinner(false));
+                try {
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                    const data = await res.json();
+                    renderPlants(data);
+                } catch (error) {
+                    handleFetchError(error);
+                } finally {
+                    toggleSpinner(false);
+                }
             };
 
-            const handlePlantsContainerClick = (e) => {
+            const handlePlantsContainerClick = async (e) => {
                 if (e.target.matches('.add-to-cart-btn')) {
                     const { id, name, price } = e.target.dataset;
                     cart.push({ id, name, price: parseFloat(price) });
@@ -339,7 +329,14 @@
                 }
                 if (e.target.matches('[data-plant-id]')) {
                     const plantId = e.target.dataset.plantId;
-                    loadPlantDetailsAsync(plantId).catch(handleFetchError);
+                    try {
+                        const res = await fetch(`${API_PLANT_DETAILS}${plantId}`);
+                        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                        const data = await res.json();
+                        renderModal(data);
+                    } catch (error) {
+                        handleFetchError(error)
+                    }
                 }
             };
             
@@ -364,14 +361,12 @@
                     const catRes = await fetch(API_CATEGORIES);
                     if (!catRes.ok) throw new Error(`Category fetch failed: ${catRes.status}`);
                     const catData = await catRes.json();
-                    console.log("Categories API Response:", catData);
                     renderCategories(catData);
 
                     // Step 2: Fetch and render all plants.
                     const plantRes = await fetch(API_PLANTS);
                     if (!plantRes.ok) throw new Error(`Plant fetch failed: ${plantRes.status}`);
                     const plantData = await plantRes.json();
-                    console.log("Plants API Response:", plantData);
                     renderPlants(plantData);
 
                     // Step 3: Render the initial empty cart.
