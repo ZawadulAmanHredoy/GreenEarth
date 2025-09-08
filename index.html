@@ -228,10 +228,9 @@
             
             // --- Rendering Functions ---
             const renderCategories = (categories) => {
-                // SAFETY CHECK: Ensure data from API is valid before using it
                 if (!categories || !Array.isArray(categories.data)) {
                     console.error("Invalid categories data received:", categories);
-                    return; // Stop execution to prevent a crash
+                    return; 
                 }
                 const allTreesButton = `<li><button data-id="all" class="category-btn w-full text-left p-3 rounded-md active">All Trees</button></li>`;
                 categoriesContainer.innerHTML = allTreesButton + categories.data.map(cat => `
@@ -240,7 +239,6 @@
             };
 
             const renderPlants = (plants) => {
-                // SAFETY CHECK: Ensure data from API is valid before using it
                 if (!plants || !Array.isArray(plants.data) || plants.data.length === 0) {
                     plantsContainer.innerHTML = `<p class="text-center text-gray-500 col-span-full">No plants found in this category.</p>`;
                     return;
@@ -303,17 +301,17 @@
                 const res = await fetch(API_CATEGORIES);
                 if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                 const data = await res.json();
+                console.log("Categories API Response:", data); // For debugging
                 renderCategories(data);
             };
             
             const loadPlantsAsync = async (categoryId = 'all') => {
-                toggleSpinner(true);
                 const url = categoryId === 'all' ? API_PLANTS : `${API_PLANTS_BY_CATEGORY}${categoryId}`;
                 const res = await fetch(url);
                 if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                 const data = await res.json();
+                console.log("Plants API Response:", data); // For debugging
                 renderPlants(data);
-                toggleSpinner(false);
             };
 
             const loadPlantDetailsAsync = async (plantId) => {
@@ -329,7 +327,10 @@
                 document.querySelectorAll('.category-btn').forEach(btn => btn.classList.remove('active'));
                 e.target.classList.add('active');
                 const categoryId = e.target.dataset.id;
-                loadPlantsAsync(categoryId).catch(handleFetchError);
+                toggleSpinner(true);
+                loadPlantsAsync(categoryId)
+                    .catch(handleFetchError)
+                    .finally(() => toggleSpinner(false));
             };
 
             const handlePlantsContainerClick = (e) => {
@@ -359,14 +360,15 @@
 
             // --- Initial Page Load ---
             const initializeApp = async () => {
+                toggleSpinner(true);
                 try {
-                    await Promise.all([
-                        loadCategoriesAsync(),
-                        loadPlantsAsync() 
-                    ]);
+                    await loadCategoriesAsync();
+                    await loadPlantsAsync();
                     renderCart();
                 } catch (error) {
                     handleFetchError(error);
+                } finally {
+                    toggleSpinner(false);
                 }
             };
 
