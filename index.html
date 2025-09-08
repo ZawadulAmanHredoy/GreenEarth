@@ -301,7 +301,6 @@
                 const res = await fetch(API_CATEGORIES);
                 if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                 const data = await res.json();
-                console.log("Categories API Response:", data); // For debugging
                 renderCategories(data);
             };
             
@@ -310,7 +309,6 @@
                 const res = await fetch(url);
                 if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                 const data = await res.json();
-                console.log("Plants API Response:", data); // For debugging
                 renderPlants(data);
             };
 
@@ -358,13 +356,27 @@
                 modalContent.innerHTML = '';
             };
 
-            // --- Initial Page Load ---
+            // --- Initial Page Load (REVISED FOR RELIABILITY) ---
             const initializeApp = async () => {
                 toggleSpinner(true);
                 try {
-                    await loadCategoriesAsync();
-                    await loadPlantsAsync();
+                    // Step 1: Fetch and render categories first.
+                    const catRes = await fetch(API_CATEGORIES);
+                    if (!catRes.ok) throw new Error(`Category fetch failed: ${catRes.status}`);
+                    const catData = await catRes.json();
+                    console.log("Categories API Response:", catData);
+                    renderCategories(catData);
+
+                    // Step 2: Fetch and render all plants.
+                    const plantRes = await fetch(API_PLANTS);
+                    if (!plantRes.ok) throw new Error(`Plant fetch failed: ${plantRes.status}`);
+                    const plantData = await plantRes.json();
+                    console.log("Plants API Response:", plantData);
+                    renderPlants(plantData);
+
+                    // Step 3: Render the initial empty cart.
                     renderCart();
+
                 } catch (error) {
                     handleFetchError(error);
                 } finally {
