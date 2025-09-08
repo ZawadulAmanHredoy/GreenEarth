@@ -220,8 +220,7 @@
                 plantsContainer.innerHTML = `
                     <div class="text-red-700 bg-red-100 p-4 rounded-lg col-span-full shadow-md">
                         <h4 class="font-bold text-lg">Error Loading Data</h4>
-                        <p class="mt-1">Could not fetch plant data. This is likely a CORS issue.</p>
-                        <p class="mt-2">Please use a CORS browser extension for local development.</p>
+                        <p class="mt-1">Could not fetch plant data. The API might be temporarily unavailable.</p>
                         <p class="text-sm mt-2 font-mono bg-red-50 p-2 rounded">Details: ${error.message}</p>
                     </div>
                 `;
@@ -229,6 +228,11 @@
             
             // --- Rendering Functions ---
             const renderCategories = (categories) => {
+                // SAFETY CHECK: Ensure data from API is valid before using it
+                if (!categories || !Array.isArray(categories.data)) {
+                    console.error("Invalid categories data received:", categories);
+                    return; // Stop execution to prevent a crash
+                }
                 const allTreesButton = `<li><button data-id="all" class="category-btn w-full text-left p-3 rounded-md active">All Trees</button></li>`;
                 categoriesContainer.innerHTML = allTreesButton + categories.data.map(cat => `
                     <li><button class="category-btn w-full text-left p-3 rounded-md hover:bg-gray-200" data-id="${cat.category_id}">${cat.category_name}</button></li>
@@ -236,8 +240,9 @@
             };
 
             const renderPlants = (plants) => {
-                if (!plants || !plants.data || plants.data.length === 0) {
-                    plantsContainer.innerHTML = `<p class="text-center text-gray-500 col-span-full">No plants found.</p>`;
+                // SAFETY CHECK: Ensure data from API is valid before using it
+                if (!plants || !Array.isArray(plants.data) || plants.data.length === 0) {
+                    plantsContainer.innerHTML = `<p class="text-center text-gray-500 col-span-full">No plants found in this category.</p>`;
                     return;
                 }
                 plantsContainer.innerHTML = plants.data.map(plant => `
@@ -274,6 +279,10 @@
             };
 
             const renderModal = (plantDetails) => {
+                if (!plantDetails || !plantDetails.data) {
+                    console.error("Invalid plant details received:", plantDetails);
+                    return;
+                }
                 const { data } = plantDetails;
                 modalContent.innerHTML = `
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
@@ -292,6 +301,7 @@
             // --- Async Data Loading Functions ---
             const loadCategoriesAsync = async () => {
                 const res = await fetch(API_CATEGORIES);
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                 const data = await res.json();
                 renderCategories(data);
             };
@@ -300,6 +310,7 @@
                 toggleSpinner(true);
                 const url = categoryId === 'all' ? API_PLANTS : `${API_PLANTS_BY_CATEGORY}${categoryId}`;
                 const res = await fetch(url);
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                 const data = await res.json();
                 renderPlants(data);
                 toggleSpinner(false);
@@ -307,6 +318,7 @@
 
             const loadPlantDetailsAsync = async (plantId) => {
                 const res = await fetch(`${API_PLANT_DETAILS}${plantId}`);
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                 const data = await res.json();
                 renderModal(data);
             };
@@ -347,7 +359,6 @@
 
             // --- Initial Page Load ---
             const initializeApp = async () => {
-                toggleSpinner(true);
                 try {
                     await Promise.all([
                         loadCategoriesAsync(),
@@ -356,8 +367,6 @@
                     renderCart();
                 } catch (error) {
                     handleFetchError(error);
-                } finally {
-                    toggleSpinner(false);
                 }
             };
 
